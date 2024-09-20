@@ -1,8 +1,8 @@
 import argparse
 
+from nerf_triplane.network import NeRFNetwork
 from nerf_triplane.provider import NeRFDataset
 from nerf_triplane.utils import *
-from nerf_triplane.network import NeRFNetwork
 
 # torch.autograd.set_detect_anomaly(True)
 # Close tf32 features. Fix low numerical accuracy on rtx30xx gpu.
@@ -198,6 +198,7 @@ if __name__ == '__main__':
 
         if opt.gui:
             from nerf_triplane.gui import NeRFGUI
+
             # we still need test_loader to provide audio features for testing.
             with NeRFGUI(opt, trainer, test_loader) as gui:
                 gui.render()
@@ -209,6 +210,7 @@ if __name__ == '__main__':
             ### evaluate metrics (slow)
             if test_loader.has_gt:
                 trainer.evaluate(test_loader)
+                
 
 
 
