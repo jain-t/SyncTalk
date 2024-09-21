@@ -1,30 +1,29 @@
-import os
 import glob
-import tqdm
+import os
 import random
-import tensorboardX
+import time
+from os.path import basename
+
+import cv2
+import imageio
 import librosa
 import librosa.filters
-from scipy import signal
-from os.path import basename
-import numpy as np
-import time
-import cv2
+import lpips
 import matplotlib.pyplot as plt
-
+import mcubes
+import numpy as np
+import tensorboardX
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
-
+import torch.optim as optim
+import tqdm
 import trimesh
-import mcubes
+from packaging import version as pver
 from rich.console import Console
+from scipy import signal
 from torch_ema import ExponentialMovingAverage
 
-from packaging import version as pver
-import imageio
-import lpips
 
 def custom_meshgrid(*args):
     # ref: https://pytorch.org/docs/stable/generated/torch.meshgrid.html?highlight=meshgrid#torch.meshgrid
@@ -694,6 +693,7 @@ class Trainer(object):
         # optionally use LPIPS loss for patch-based training
         if self.opt.patch_size > 1 or self.opt.finetune_lips or True:
             import lpips
+
             # self.criterion_lpips_vgg = lpips.LPIPS(net='vgg').to(self.device)
             self.criterion_lpips_alex = lpips.LPIPS(net='alex').to(self.device)
 
@@ -1040,6 +1040,39 @@ class Trainer(object):
         self.use_tensorboardX = use_tensorboardX
 
     # Function to blend two images with a mask
+
+    def test_real_time(self, loader):
+        self.log(f"==> Start Real-Time Test")
+
+        self.model.eval()
+
+        with torch.no_grad():
+            for i, data in enumerate(loader):
+                
+                with torch.cuda.amp.autocast(enabled=self.fp16):
+                    preds, preds_depth = self.test_step(data)
+                    
+                # Convert prediction tensor to a NumPy array
+                pred_rgb = preds[0].detach().cpu().numpy()
+                pred_rgb = (pred_rgb * 255).astype(np.uint8)
+
+                pred_depth = preds_depth[0].detach().cpu().numpy()
+                pred_depth = (pred_depth * 255).astype(np.uint8)
+
+                # Display the RGB image using OpenCV in real-time
+                cv2.imshow('Real-Time Rendering', pred_rgb)
+
+                # Optional: Display the depth map
+                # cv2.imshow('Depth Map', pred_depth)
+
+                # Wait for a short delay to control the frame rate, adjust if necessary
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+
+        # Clean up windows
+        cv2.destroyAllWindows()
+        self.log(f"==> Finished Real-Time Test.")
+
 
     def test(self, loader, save_path=None, name=None, write_image=False):
 
