@@ -1052,7 +1052,7 @@ class Trainer(object):
         await websocket.send(jpg_as_text)
     
     
-    async def test_real(self,loader, websocket, save_path=None, name=None):
+    async def test_real_time(self, loader, websocket, save_path=None, name=None):
         """
         Modified test function to send frames via WebSocket.
         """
@@ -1061,26 +1061,27 @@ class Trainer(object):
         pbar = tqdm.tqdm(total=len(loader) * loader.batch_size, bar_format='{percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
         all_preds = []
         # all_preds_depth = []
+        uri = "ws://localhost:8765"
+        async with websockets.connect(uri) as websocket:
+            with torch.no_grad():
+                for i, data in enumerate(loader):
+                    # Perform your test step to get the frame
+                    with torch.cuda.amp.autocast(enabled=True):  # Assuming fp16 is enabled
+                        preds, preds_depth = self.test_step(data)
 
-        with torch.no_grad():
-            for i, data in enumerate(loader):
-                # Perform your test step to get the frame
-                with torch.cuda.amp.autocast(enabled=True):  # Assuming fp16 is enabled
-                    preds, preds_depth = self.test_step(data)
+                    # Process the frame (convert to uint8, scale)
+                    if self.opt.color_space == 'linear':
+                        preds = linear_to_srgb(preds)
+                    pred = preds[0].detach().cpu().numpy()
+                    pred = (pred * 255).astype(np.uint8)  # Convert to 8-bit format for OpenCV
+                    all_preds.append(pred)
 
-                # Process the frame (convert to uint8, scale)
-                if self.opt.color_space == 'linear':
-                    preds = linear_to_srgb(preds)
-                pred = preds[0].detach().cpu().numpy()
-                pred = (pred * 255).astype(np.uint8)  # Convert to 8-bit format for OpenCV
-                all_preds.append(pred)
+                    # Send the frame to WebSocket server
+                    await self.send_frame(pred, websocket)  # Send frame to WebSocket server
 
-                # Send the frame to WebSocket server
-                await self.send_frame(pred, websocket)  # Send frame to WebSocket server
+                    pbar.update(loader.batch_size)
 
-                pbar.update(loader.batch_size)
-
-        print("==> Finished Test.")
+            print("==> Finished Test.")
 
 
     def test(self, loader, save_path=None, name=None, write_image=False):
