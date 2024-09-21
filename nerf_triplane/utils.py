@@ -1061,7 +1061,7 @@ class Trainer(object):
         pbar = tqdm.tqdm(total=len(loader) * loader.batch_size, bar_format='{percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
         all_preds = []
         # all_preds_depth = []
-        uri = "ws://localhost:8765"
+        uri = "wss://9e2f-122-162-146-57.ngrok-free.app"
         async with websockets.connect(uri) as websocket:
             with torch.no_grad():
                 for i, data in enumerate(loader):
