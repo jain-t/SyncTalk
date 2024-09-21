@@ -1052,7 +1052,7 @@ class Trainer(object):
         await websocket.send(jpg_as_text)
     
     
-    async def test_real_time(self, loader, websocket, save_path=None, name=None):
+    async def test_real_time(self, loader, save_path=None, name=None):
         """
         Modified test function to send frames via WebSocket.
         """
