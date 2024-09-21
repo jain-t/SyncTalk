@@ -206,7 +206,7 @@ if __name__ == '__main__':
         else:
             ### test and save video (fast)  
             # trainer.test_real_time(test_loader)
-            asyncio.get_event_loop().run_until_complete(trainer.test_real_time(test_loader))
+            asyncio.run(trainer.test_real_time(test_loader))
             
 
             ### evaluate metrics (slow)
