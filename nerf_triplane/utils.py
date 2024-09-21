@@ -1,3 +1,5 @@
+import asyncio
+import base64
 import glob
 import os
 import random
@@ -19,6 +21,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import tqdm
 import trimesh
+import websockets
 from packaging import version as pver
 from rich.console import Console
 from scipy import signal
@@ -1040,38 +1043,52 @@ class Trainer(object):
         self.use_tensorboardX = use_tensorboardX
 
     # Function to blend two images with a mask
+    
+    
+    async def send_frame(self,frame, websocket):
+        """Encodes and sends the frame over WebSocket."""
+        _, buffer = cv2.imencode('.jpg', frame)
+        jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+        await websocket.send(jpg_as_text)
+    
+    
+    async def test_real(self,loader, websocket, save_path=None, name=None):
+        """
+        Modified test function to send frames via WebSocket.
+        """
+        if save_path is None:
+            save_path = os.path.join('workspace', 'results')
 
-    def test_real_time(self, loader):
-        self.log(f"==> Start Real-Time Test")
+        if name is None:
+            name = 'test_real_ep'
 
-        self.model.eval()
+        os.makedirs(save_path, exist_ok=True)
+
+        print(f"==> Start Test, save results to {save_path}")
+
+        pbar = tqdm.tqdm(total=len(loader) * loader.batch_size, bar_format='{percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
+        all_preds = []
+        # all_preds_depth = []
 
         with torch.no_grad():
             for i, data in enumerate(loader):
-                
-                with torch.cuda.amp.autocast(enabled=self.fp16):
+                # Perform your test step to get the frame
+                with torch.cuda.amp.autocast(enabled=True):  # Assuming fp16 is enabled
                     preds, preds_depth = self.test_step(data)
-                    
-                # Convert prediction tensor to a NumPy array
-                pred_rgb = preds[0].detach().cpu().numpy()
-                pred_rgb = (pred_rgb * 255).astype(np.uint8)
 
-                pred_depth = preds_depth[0].detach().cpu().numpy()
-                pred_depth = (pred_depth * 255).astype(np.uint8)
+                # Process the frame (convert to uint8, scale)
+                if self.opt.color_space == 'linear':
+                    preds = linear_to_srgb(preds)
+                pred = preds[0].detach().cpu().numpy()
+                pred = (pred * 255).astype(np.uint8)  # Convert to 8-bit format for OpenCV
+                all_preds.append(pred)
 
-                # Display the RGB image using OpenCV in real-time
-                cv2.imshow('Real-Time Rendering', pred_rgb)
+                # Send the frame to WebSocket server
+                await self.send_frame(pred, websocket)  # Send frame to WebSocket server
 
-                # Optional: Display the depth map
-                # cv2.imshow('Depth Map', pred_depth)
+                pbar.update(loader.batch_size)
 
-                # Wait for a short delay to control the frame rate, adjust if necessary
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-
-        # Clean up windows
-        cv2.destroyAllWindows()
-        self.log(f"==> Finished Real-Time Test.")
+        print("==> Finished Test.")
 
 
     def test(self, loader, save_path=None, name=None, write_image=False):
