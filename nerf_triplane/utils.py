@@ -1056,15 +1056,7 @@ class Trainer(object):
         """
         Modified test function to send frames via WebSocket.
         """
-        if save_path is None:
-            save_path = os.path.join('workspace', 'results')
-
-        if name is None:
-            name = 'test_real_ep'
-
-        os.makedirs(save_path, exist_ok=True)
-
-        print(f"==> Start Test, save results to {save_path}")
+        
 
         pbar = tqdm.tqdm(total=len(loader) * loader.batch_size, bar_format='{percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
         all_preds = []
